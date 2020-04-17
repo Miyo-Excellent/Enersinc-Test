@@ -1,111 +1,64 @@
 import React, { Component } from 'react';
-import { Button, Layout, Input, Table } from 'antd';
-import _ from 'lodash';
+import { connect } from 'react-redux';
 
-import getSeries from './api/getSeries';
+import EnersincTable from './EnersincTable';
+
+import { asyncData } from './actions';
 
 import 'antd/dist/antd.css';
+import { Input } from 'antd';
 
-const { Content, Header } = Layout;
-
-export default class App extends Component {
+class App extends Component {
   constructor(props) {
     super(props);
 
-    this.state = {
-      isLoading: false,
-      less: null,
-      higher: null,
-      columns: [
-        {
-          title: 'Fecha',
-          dataIndex: 'date',
-          onFilter: (value, record) => record.date.indexOf(value) === 0,
-          sorter: (a, b) => parseFloat(a.date) - parseFloat(b.date),
-          sortDirections: ['descend', 'ascend'],
-        },
-        {
-          title: 'Generación',
-          dataIndex: 'generation',
-          onFilter: (value, record) => record.generation.indexOf(value) === 0,
-          sorter: (a, b) => a.generation - b.generation,
-          sortDirections: ['descend', 'ascend'],
-          render: (generation, record) => {
-            const isHigher = record.generation === record.higher.generation;
-            const isLess = record.generation === record.less.generation;
-            const color = '#000000';
+    this.state = {};
+    this.columns = [
+      {
+        title: 'Fecha',
+        dataIndex: 'date',
+        onFilter: (value, record) => record.date.indexOf(value) === 0,
+        sorter: (a, b) => parseFloat(a.date) - parseFloat(b.date),
+        sortDirections: ['descend', 'ascend'],
+      },
+      {
+        title: 'Generación',
+        dataIndex: 'generation',
+        onFilter: (value, record) => record.generation.indexOf(value) === 0,
+        sorter: (a, b) => a.generation - b.generation,
+        sortDirections: ['descend', 'ascend'],
+        render: (generation, record) => {
+          const color = '#000000';
 
-            let background = null;
+          let isHigher = record.generation === record.higher.generation;
+          let isLess = record.generation === record.less.generation;
 
-            if (isHigher) {
-              background = '#7db65f';
-            } else if (isLess) {
-              background = '#5d82d5';
-            }
+          let background = null;
 
-            return (
-              <Input
-                placeholder={`${record.generation}`}
-                style={{ background, color }}
-              />
-            );
-          },
+          if (!!isHigher) {
+            background = '#7db65f';
+          } else if (!!isLess) {
+            background = '#5d82d5';
+          }
+
+          return (
+            <Input
+              placeholder={`${record.generation}`}
+              style={{ background, color }}
+            />
+          );
         },
-        {
-          title: 'Unidades',
-          dataIndex: 'units',
-        },
-      ],
-      data: [],
-    };
+      },
+      {
+        title: 'Unidades',
+        dataIndex: 'units',
+      },
+    ];
   }
 
   async componentWillMount() {
-    await this.getData();
+    await this.props.asyncData();
   }
-
-  getData = async () => {
-    this.setState({ isLoading: true });
-
-    const series = await getSeries();
-
-    if (
-      !!series &&
-      !!series.series &&
-      !!series.series[0] &&
-      !!series.series[0].data
-    ) {
-      const data = series.series[0].data;
-
-      const dataSort = _.sortBy(data, (el = []) => el[1]);
-
-      let less = null;
-      let higher = null;
-
-      if (!!dataSort && !!dataSort.length) {
-        less = { date: dataSort[0][0], generation: dataSort[0][1] };
-
-        higher = {
-          date: dataSort[dataSort.length - 1][0],
-          generation: dataSort[dataSort.length - 1][1],
-        };
-      }
-
-      this.setState({
-        isLoading: false,
-        less,
-        higher,
-        data:
-          !!data && !!data.length
-            ? data.map((el) => ({
-                date: el[0],
-                generation: el[1],
-                units: 'kWh',
-              }))
-            : [],
-      });
-    }
-  };
 
   onChange = (pagination, filters, sorter, extra) => {
     console.log('params', pagination, filters, sorter, extra);
@@ -113,36 +66,35 @@ export default class App extends Component {
 
   render() {
     const {
-      columns = [],
       data = [],
       higher = null,
       isLoading = false,
       less = null,
-    } = this.state;
+    } = this.props;
 
     return (
-      <Layout>
-        <Header>
-          <Button
-            type="primary"
-            onClick={this.getData}
-            disabled={isLoading}
-            loading={isLoading}
-          >
-            Actualizar
-          </Button>
-        </Header>
-
-        <Content>
-          <Table
-            columns={columns}
-            dataSource={
-              !isLoading ? data.map((el = {}) => ({ ...el, higher, less })) : []
-            }
-            onChange={this.onChange}
-          />
-        </Content>
-      </Layout>
+      <EnersincTable
+        columns={this.columns}
+        data={data}
+        higher={higher}
+        isLoading={isLoading}
+        less={less}
+        getData={this.props.asyncData}
+        onChange={this.onChange}
+      />
     );
   }
 }
+
+const mapStateToProps = (state = {}) => ({
+  isLoading: state.isLoading,
+  less: state.less,
+  higher: state.higher,
+  data: state.data,
+});
+
+const mapDispatchToProps = (dispatch) => ({
+  asyncData: async () => await asyncData({ dispatch }),
+});
+
+export default connect(mapStateToProps, mapDispatchToProps)(App);
